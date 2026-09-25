@@ -1,0 +1,7 @@
+{
+  "name": "AegisRewards Android & Fraud Security Suite",
+  "description": "Production-ready Android build, Firebase auth/rules, server-authoritative anti-fraud verification, ledger points transactions, and admin risk monitoring suite.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
+
