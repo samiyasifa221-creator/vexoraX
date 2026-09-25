@@ -51,7 +51,7 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({ onComplete, lang }) 
         {/* Brand Name & Tagline */}
         <div>
           <h1 className="text-3xl font-black tracking-tight text-white flex items-center justify-center gap-2">
-            <span>LoopPulse</span>
+            <span>VexoraX</span>
             <span className="text-xs bg-purple-500/30 text-purple-300 border border-purple-400/40 px-2 py-0.5 rounded-full font-bold uppercase">
               PRO
             </span>
@@ -75,7 +75,7 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({ onComplete, lang }) 
       </div>
 
       <div className="absolute bottom-6 text-[10px] text-purple-300/60 font-mono">
-        LoopPulse Pro v1.2.0 • Android 15 • Zero-Trust Engine
+        VexoraX v1.0.0 • Android (API 35/36) • Zero-Trust Engine
       </div>
     </div>
   );

@@ -74,6 +74,13 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
   const [newLinkType, setNewLinkType] = useState<'Adsterra' | 'Blogger'>('Blogger');
   const [newLinkTitle, setNewLinkTitle] = useState('');
 
+  // Edit Link state
+  const [editingLink, setEditingLink] = useState<UserLink | null>(null);
+  const [editLinkUrl, setEditLinkUrl] = useState('');
+  const [editLinkType, setEditLinkType] = useState<any>('Adsterra');
+  const [editLinkTitle, setEditLinkTitle] = useState('');
+  const [editLinkTargetViews, setEditLinkTargetViews] = useState<number>(50);
+
   // Campaign state
   const [campaigns, setCampaigns] = useState<UserCampaign[]>([]);
   const [campaignFilter, setCampaignFilter] = useState<'ALL' | 'ACTIVE' | 'COMPLETED' | 'CANCELLED'>('ALL');
@@ -224,6 +231,39 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
         setFeedback({ type: 'success', message: 'Link deleted successfully' });
         loadLinks();
       }
+    } catch (err: any) {
+      setFeedback({ type: 'error', message: err.message });
+    }
+  };
+
+  const openEditLinkModal = (link: UserLink) => {
+    setEditingLink(link);
+    setEditLinkUrl(link.url);
+    setEditLinkType(link.type);
+    setEditLinkTitle(link.title);
+    setEditLinkTargetViews(link.targetViews || 50);
+  };
+
+  const handleUpdateLink = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingLink) return;
+    setFeedback(null);
+    try {
+      const res = await fetch(`/api/links/${editingLink.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          url: editLinkUrl,
+          title: editLinkTitle,
+          type: editLinkType,
+          targetViews: editLinkTargetViews,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || 'Failed to update link');
+      setFeedback({ type: 'success', message: 'Link successfully updated!' });
+      setEditingLink(null);
+      loadLinks();
     } catch (err: any) {
       setFeedback({ type: 'error', message: err.message });
     }
@@ -508,6 +548,14 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                       }`}
                     >
                       {link.status === 'ACTIVE' ? 'Deactivate' : 'Activate'}
+                    </button>
+
+                    <button
+                      onClick={() => openEditLinkModal(link)}
+                      className="text-[11px] text-purple-400 hover:text-purple-300 flex items-center gap-1 font-semibold"
+                    >
+                      <Edit2 className="w-3 h-3" />
+                      Edit
                     </button>
 
                     <button
@@ -946,6 +994,94 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
               >
                 Save &amp; Activate Link
               </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Link Modal */}
+      {editingLink && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-purple-500/40 rounded-3xl max-w-md w-full p-5 shadow-2xl relative space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-extrabold text-white">Edit Campaign Ad Link</h3>
+              <button onClick={() => setEditingLink(null)} className="text-slate-400 hover:text-white">
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleUpdateLink} className="space-y-3 text-xs">
+              <div>
+                <label className="text-slate-300 block mb-1 font-semibold">Link Type</label>
+                <div className="flex gap-2">
+                  {['Adsterra', 'Blogger', 'DirectLink'].map((type) => (
+                    <button
+                      key={type}
+                      type="button"
+                      onClick={() => setEditLinkType(type)}
+                      className={`flex-1 py-2 rounded-xl font-bold border transition-all ${
+                        editLinkType === type
+                          ? 'bg-purple-600 border-purple-500 text-white'
+                          : 'bg-slate-950 border-purple-900/30 text-slate-400'
+                      }`}
+                    >
+                      {type}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="text-slate-300 block mb-1 font-semibold">Real Campaign URL</label>
+                <input
+                  type="url"
+                  required
+                  placeholder="https://unlikelycharitablewanting.com/..."
+                  value={editLinkUrl}
+                  onChange={(e) => setEditLinkUrl(e.target.value)}
+                  className="w-full bg-slate-950 border border-purple-900/40 rounded-xl px-3 py-2 text-white placeholder-slate-600 focus:outline-none focus:border-purple-500 font-mono text-[11px]"
+                />
+              </div>
+
+              <div>
+                <label className="text-slate-300 block mb-1 font-semibold">Link Title</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. My Live Adsterra Stream"
+                  value={editLinkTitle}
+                  onChange={(e) => setEditLinkTitle(e.target.value)}
+                  className="w-full bg-slate-950 border border-purple-900/40 rounded-xl px-3 py-2 text-white placeholder-slate-600 focus:outline-none focus:border-purple-500"
+                />
+              </div>
+
+              <div>
+                <label className="text-slate-300 block mb-1 font-semibold">Target Views</label>
+                <input
+                  type="number"
+                  min="10"
+                  step="10"
+                  value={editLinkTargetViews}
+                  onChange={(e) => setEditLinkTargetViews(Number(e.target.value))}
+                  className="w-full bg-slate-950 border border-purple-900/40 rounded-xl px-3 py-2 text-white placeholder-slate-600 focus:outline-none focus:border-purple-500 font-mono"
+                />
+              </div>
+
+              <div className="flex gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setEditingLink(null)}
+                  className="flex-1 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold rounded-xl transition-all"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 py-2.5 bg-purple-600 hover:bg-purple-500 text-white font-extrabold rounded-xl transition-all shadow-lg"
+                >
+                  Save Changes
+                </button>
+              </div>
             </form>
           </div>
         </div>

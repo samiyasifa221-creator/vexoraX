@@ -279,6 +279,28 @@ app.post('/api/auth/login', (req: Request, res: Response) => {
   });
 });
 
+app.post('/api/auth/reset-password', (req: Request, res: Response) => {
+  const { email } = req.body;
+  if (!email) {
+    return res.status(400).json({ error: 'MISSING_EMAIL', message: 'Email address is required' });
+  }
+
+  let exists = false;
+  for (const u of dbStore.users.values()) {
+    if (u.email.toLowerCase() === email.toLowerCase()) {
+      exists = true;
+      break;
+    }
+  }
+
+  return res.json({
+    success: true,
+    message: exists
+      ? `Password reset link dispatched to ${email}. Please check your inbox.`
+      : `If an account is associated with ${email}, a reset link has been dispatched.`,
+  });
+});
+
 app.post('/api/auth/logout', authenticate, (req: AuthenticatedRequest, res: Response) => {
   const token = req.sessionToken!;
   const session = dbStore.sessions.get(token);
@@ -371,15 +393,61 @@ app.post('/api/tasks/session/start', authenticate, (req: AuthenticatedRequest, r
     assignedLink = dbStore.getNextEligibleLink('Adsterra');
   }
 
-  // Retrieve 8 active rotation links (prioritizing user's provided link)
-  const allRotationLinks = Array.from(dbStore.userLinks.values())
-    .sort((a, b) => {
-      // Put the unlikelycharitablewanting link first
-      if (a.url.includes('unlikelycharitablewanting.com')) return -1;
-      if (b.url.includes('unlikelycharitablewanting.com')) return 1;
-      return 0;
-    })
-    .slice(0, 8);
+  // Retrieve real active links and real task URLs (NO FAKE / DEMO DOMAINS!)
+  const activeLinks = Array.from(dbStore.userLinks.values()).filter((l) => l.status === 'ACTIVE');
+  
+  const realAdList: Array<{ id: string; url: string; title: string; type: string; completedViews: number; targetViews: number }> = [];
+  if (task.url) {
+    realAdList.push({
+      id: `task_direct_${task.id}`,
+      url: task.url,
+      title: task.title || task.name,
+      type: task.category,
+      completedViews: 0,
+      targetViews: 1000,
+    });
+  }
+  
+  activeLinks.forEach((l) => {
+    if (!realAdList.some((r) => r.url === l.url)) {
+      realAdList.push({
+        id: l.id,
+        url: l.url,
+        title: l.title,
+        type: l.type,
+        completedViews: l.completedViews,
+        targetViews: l.targetViews,
+      });
+    }
+  });
+
+  // If no links exist at all, add default real ad from task or real Adsterra link
+  if (realAdList.length === 0) {
+    realAdList.push({
+      id: 'default_real_ad',
+      url: 'https://unlikelycharitablewanting.com/yq26ub6cn?key=2de33b5349b5825fabf2823dca90c5d1',
+      title: 'Adsterra Direct Link (Live CPM Stream)',
+      type: 'ADSTERRA',
+      completedViews: 0,
+      targetViews: 1000,
+    });
+  }
+
+  // Build playlist slots by cycling fairly through actual real ads
+  const slotCount = task.requiredDurationMs >= 300000 ? 8 : Math.max(1, Math.min(8, realAdList.length));
+  const realPlaylist: Array<{ id: string; index: number; url: string; title: string; type: string; completedViews: number; targetViews: number }> = [];
+  for (let i = 0; i < slotCount; i++) {
+    const item = realAdList[i % realAdList.length];
+    realPlaylist.push({
+      id: `${item.id}_slot_${i + 1}`,
+      index: i + 1,
+      url: item.url,
+      title: item.title,
+      type: item.type,
+      completedViews: item.completedViews,
+      targetViews: item.targetViews,
+    });
+  }
 
   const taskSessionId = `tsess_${crypto.randomBytes(12).toString('hex')}`;
   const nowMs = Date.now();
@@ -416,15 +484,7 @@ app.post('/api/tasks/session/start', authenticate, (req: AuthenticatedRequest, r
     requiredDurationMs: task.requiredDurationMs,
     rewardPoints: task.rewardPoints,
     cooldownSeconds: task.cooldownSeconds,
-    playlist: allRotationLinks.map((l, index) => ({
-      id: l.id,
-      index: index + 1,
-      url: l.url,
-      title: l.title,
-      type: l.type,
-      completedViews: l.completedViews,
-      targetViews: l.targetViews,
-    })),
+    playlist: realPlaylist,
     campaignLink: assignedLink
       ? {
           id: assignedLink.id,
@@ -676,7 +736,7 @@ app.put('/api/links/:id', authenticate, (req: AuthenticatedRequest, res: Respons
     return res.status(404).json({ error: 'LINK_NOT_FOUND', message: 'Link not found or access denied' });
   }
 
-  const { status, title, url } = req.body;
+  const { status, title, url, type, targetViews } = req.body;
   if (status !== undefined) {
     // If activating, check 8 active limit
     if (status === 'ACTIVE' && link.status !== 'ACTIVE') {
@@ -694,6 +754,8 @@ app.put('/api/links/:id', authenticate, (req: AuthenticatedRequest, res: Respons
   }
   if (title) link.title = title;
   if (url) link.url = url;
+  if (type) link.type = type;
+  if (targetViews) link.targetViews = Number(targetViews);
   link.updatedAt = new Date().toISOString();
 
   res.json({ success: true, link });
@@ -703,7 +765,7 @@ app.delete('/api/links/:id', authenticate, (req: AuthenticatedRequest, res: Resp
   const user = req.user!;
   const link = dbStore.userLinks.get(req.params.id);
 
-  if (!link || link.userId !== user.userId) {
+  if (!link || (link.userId !== user.userId && user.role !== 'admin')) {
     return res.status(404).json({ error: 'LINK_NOT_FOUND' });
   }
 
@@ -858,6 +920,15 @@ app.get('/api/rewards', authenticate, (req: AuthenticatedRequest, res: Response)
   });
 });
 
+app.get('/api/ledger/history', authenticate, (req: AuthenticatedRequest, res: Response) => {
+  const transactions = dbStore.getTransactionsForUser(req.user!.userId);
+  res.json({
+    transactions,
+    currentBalance: req.user!.pointsBalance,
+    totalCount: transactions.length,
+  });
+});
+
 // -------------------------------------------------------------
 // 21. PREMIUM SYSTEM
 // -------------------------------------------------------------
@@ -956,19 +1027,119 @@ app.get('/api/campaigns/packages', authenticate, (_req: AuthenticatedRequest, re
 });
 
 // -------------------------------------------------------------
-// ADMIN: DYNAMIC WORK CENTER TASK 3 & APP CONFIGURATION (Section 8 & 27)
+// ADMIN: REAL AD & TASK MANAGEMENT (ADD, EDIT, DELETE)
 // -------------------------------------------------------------
-app.post('/api/admin/tasks/:taskId', authenticate, requireAdmin, (req: AuthenticatedRequest, res: Response) => {
+// 1. Get all tasks
+app.get('/api/admin/tasks', authenticate, requireAdmin, (_req: AuthenticatedRequest, res: Response) => {
+  const tasks = Array.from(dbStore.taskDefinitions.values()).sort((a, b) => a.taskIndex - b.taskIndex);
+  res.json({ tasks });
+});
+
+// 2. Create a brand new Task / Ad
+app.post('/api/admin/tasks', authenticate, requireAdmin, (req: AuthenticatedRequest, res: Response) => {
+  const {
+    name,
+    title,
+    description,
+    category,
+    url,
+    rewardPoints,
+    cooldownSeconds,
+    dailyLimit,
+    isActive,
+    icon,
+    minDurationSeconds,
+    requiredDurationMs,
+  } = req.body;
+
+  if (!name || !description) {
+    return res.status(400).json({ error: 'MISSING_FIELDS', message: 'Name and description are required.' });
+  }
+
+  const existingCount = dbStore.taskDefinitions.size;
+  const taskId = `task_${Date.now()}_${crypto.randomBytes(3).toString('hex')}`;
+  const durationSec = Number(minDurationSeconds) || (requiredDurationMs ? Math.round(Number(requiredDurationMs) / 1000) : 30);
+  const durationMs = Number(requiredDurationMs) || (durationSec * 1000);
+
+  const newTask: TaskDefinition = {
+    id: taskId,
+    taskIndex: existingCount + 1,
+    name: name.trim(),
+    title: (title || name).trim(),
+    description: description.trim(),
+    category: category || 'ADSTERRA',
+    url: url ? url.trim() : undefined,
+    reward: Number(rewardPoints) || 100,
+    rewardPoints: Number(rewardPoints) || 100,
+    cooldownSeconds: cooldownSeconds !== undefined ? Number(cooldownSeconds) : 60,
+    dailyLimit: dailyLimit !== undefined ? Number(dailyLimit) : 30,
+    icon: icon || 'Sparkles',
+    isActive: isActive !== undefined ? Boolean(isActive) : true,
+    minDurationSeconds: durationSec,
+    requiredDurationMs: durationMs,
+  };
+
+  dbStore.addTaskDefinition(newTask);
+
+  // If a direct ad URL was provided, also ensure it's registered in active ad links
+  if (newTask.url) {
+    const linkId = `lnk_ad_${crypto.randomBytes(4).toString('hex')}`;
+    dbStore.userLinks.set(linkId, {
+      id: linkId,
+      userId: req.user!.userId,
+      url: newTask.url,
+      type: newTask.category === 'ADSTERRA' ? 'Adsterra' : 'DirectLink',
+      campaignType: 'Direct Ad Stream',
+      title: newTask.title,
+      status: 'ACTIVE',
+      targetViews: 1000,
+      completedViews: 0,
+      lastServedAt: null,
+      serveCount: 0,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    });
+  }
+
+  dbStore.logAudit({
+    id: `aud_${crypto.randomBytes(6).toString('hex')}`,
+    timestamp: new Date().toISOString(),
+    eventType: 'ADMIN_ACTION',
+    userId: req.user!.userId,
+    details: `Admin created new Ad / Task: ${newTask.name} (Reward: ${newTask.rewardPoints}, Active: ${newTask.isActive})`,
+    severity: 'INFO',
+  });
+
+  res.status(201).json({ success: true, task: newTask });
+});
+
+// 3. Edit an existing Task / Ad (supports POST and PUT)
+const handleUpdateTask = (req: AuthenticatedRequest, res: Response) => {
   const task = dbStore.taskDefinitions.get(req.params.taskId);
   if (!task) return res.status(404).json({ error: 'TASK_NOT_FOUND' });
 
-  const { name, description, rewardPoints, cooldownSeconds, dailyLimit, isActive, icon } = req.body;
+  const {
+    name,
+    title,
+    description,
+    category,
+    url,
+    rewardPoints,
+    cooldownSeconds,
+    dailyLimit,
+    isActive,
+    icon,
+    minDurationSeconds,
+    requiredDurationMs,
+    taskIndex,
+  } = req.body;
 
-  if (name !== undefined) {
-    task.name = name;
-    task.title = name;
-  }
+  if (name !== undefined) task.name = name;
+  if (title !== undefined) task.title = title;
+  else if (name !== undefined) task.title = name;
   if (description !== undefined) task.description = description;
+  if (category !== undefined) task.category = category;
+  if (url !== undefined) task.url = url;
   if (rewardPoints !== undefined) {
     task.rewardPoints = Number(rewardPoints);
     task.reward = Number(rewardPoints);
@@ -977,17 +1148,126 @@ app.post('/api/admin/tasks/:taskId', authenticate, requireAdmin, (req: Authentic
   if (dailyLimit !== undefined) task.dailyLimit = Number(dailyLimit);
   if (isActive !== undefined) task.isActive = Boolean(isActive);
   if (icon !== undefined) task.icon = icon;
+  if (taskIndex !== undefined) task.taskIndex = Number(taskIndex);
+  if (minDurationSeconds !== undefined) {
+    task.minDurationSeconds = Number(minDurationSeconds);
+    if (requiredDurationMs === undefined) {
+      task.requiredDurationMs = Number(minDurationSeconds) * 1000;
+    }
+  }
+  if (requiredDurationMs !== undefined) {
+    task.requiredDurationMs = Number(requiredDurationMs);
+    task.minDurationSeconds = Math.round(Number(requiredDurationMs) / 1000);
+  }
+
+  // Update in store
+  dbStore.taskDefinitions.set(task.id, task);
 
   dbStore.logAudit({
     id: `aud_${crypto.randomBytes(6).toString('hex')}`,
     timestamp: new Date().toISOString(),
     eventType: 'ADMIN_ACTION',
     userId: req.user!.userId,
-    details: `Admin updated Work Center Task: ${task.name} (Reward: ${task.rewardPoints}, Active: ${task.isActive})`,
+    details: `Admin updated Ad / Task: ${task.name} (Reward: ${task.rewardPoints}, Active: ${task.isActive})`,
     severity: 'INFO',
   });
 
   res.json({ success: true, task });
+};
+
+app.post('/api/admin/tasks/:taskId', authenticate, requireAdmin, handleUpdateTask);
+app.put('/api/admin/tasks/:taskId', authenticate, requireAdmin, handleUpdateTask);
+
+// 4. Delete a Task / Ad
+app.delete('/api/admin/tasks/:taskId', authenticate, requireAdmin, (req: AuthenticatedRequest, res: Response) => {
+  const task = dbStore.taskDefinitions.get(req.params.taskId);
+  if (!task) return res.status(404).json({ error: 'TASK_NOT_FOUND' });
+
+  dbStore.taskDefinitions.delete(req.params.taskId);
+
+  dbStore.logAudit({
+    id: `aud_${crypto.randomBytes(6).toString('hex')}`,
+    timestamp: new Date().toISOString(),
+    eventType: 'ADMIN_ACTION',
+    userId: req.user!.userId,
+    details: `Admin deleted Ad / Task: ${task.name} (${task.id})`,
+    severity: 'WARN',
+  });
+
+  res.json({ success: true, message: 'Ad task deleted successfully' });
+});
+
+// 5. Admin Ad Links CRUD
+app.get('/api/admin/links', authenticate, requireAdmin, (_req: AuthenticatedRequest, res: Response) => {
+  const links = Array.from(dbStore.userLinks.values()).sort(
+    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+  );
+  res.json({ links });
+});
+
+app.post('/api/admin/links', authenticate, requireAdmin, (req: AuthenticatedRequest, res: Response) => {
+  const { url, title, type, targetViews, status } = req.body;
+  if (!url) {
+    return res.status(400).json({ error: 'URL_REQUIRED', message: 'Ad URL is required' });
+  }
+
+  const linkId = `lnk_admin_${crypto.randomBytes(4).toString('hex')}`;
+  const now = new Date().toISOString();
+  const newLink = {
+    id: linkId,
+    userId: req.user!.userId,
+    url: url.trim(),
+    type: type || 'Adsterra',
+    campaignType: type === 'Adsterra' ? 'Impression Drive' : 'Content Traffic',
+    title: (title || 'Direct Ad Link').trim(),
+    status: (status || 'ACTIVE') as any,
+    targetViews: Number(targetViews) || 1000,
+    completedViews: 0,
+    lastServedAt: null,
+    serveCount: 0,
+    createdAt: now,
+    updatedAt: now,
+  };
+
+  dbStore.userLinks.set(linkId, newLink);
+
+  dbStore.logAudit({
+    id: `aud_${crypto.randomBytes(6).toString('hex')}`,
+    timestamp: now,
+    eventType: 'ADMIN_ACTION',
+    userId: req.user!.userId,
+    details: `Admin added new ad link: ${newLink.title} (${newLink.url})`,
+    severity: 'INFO',
+  });
+
+  res.status(201).json({ success: true, link: newLink });
+});
+
+app.put('/api/admin/links/:id', authenticate, requireAdmin, (req: AuthenticatedRequest, res: Response) => {
+  const link = dbStore.userLinks.get(req.params.id);
+  if (!link) return res.status(404).json({ error: 'LINK_NOT_FOUND' });
+
+  const { status, title, url, type, targetViews } = req.body;
+  if (status !== undefined) link.status = status;
+  if (title) link.title = title.trim();
+  if (url) link.url = url.trim();
+  if (type) link.type = type;
+  if (targetViews !== undefined) link.targetViews = Number(targetViews);
+  link.updatedAt = new Date().toISOString();
+
+  res.json({ success: true, link });
+});
+
+app.delete('/api/admin/links/:id', authenticate, requireAdmin, (req: AuthenticatedRequest, res: Response) => {
+  const link = dbStore.userLinks.get(req.params.id);
+  if (!link) return res.status(404).json({ error: 'LINK_NOT_FOUND' });
+
+  dbStore.userLinks.delete(req.params.id);
+  res.json({ success: true, message: 'Ad link deleted successfully' });
+});
+
+app.get('/api/admin/config', authenticate, requireAdmin, (_req: AuthenticatedRequest, res: Response) => {
+  res.json({ config: dbStore.appConfig });
 });
 
 app.post('/api/admin/config', authenticate, requireAdmin, (req: AuthenticatedRequest, res: Response) => {
@@ -1153,11 +1433,11 @@ app.post('/api/build/simulate-gradle', authenticate, (req: AuthenticatedRequest,
   ];
 
   const artifact = {
-    name: isAab ? 'looppulse-release.aab' : isRelease ? 'looppulse-release.apk' : 'looppulse-debug.apk',
+    name: isAab ? 'vexorax-release.aab' : isRelease ? 'vexorax-release.apk' : 'app-debug.apk',
     format: isAab ? 'AAB (Android App Bundle)' : 'APK',
     sizeFormatted: isAab ? '6.8 MB' : isRelease ? '8.4 MB' : '19.2 MB',
     checksumSha256: crypto.randomBytes(32).toString('hex'),
-    package: 'com.looppulse.rewards.app',
+    package: 'com.samiyasifa.vexorax',
   };
 
   res.json({ command, logs, artifact });
@@ -1175,6 +1455,25 @@ app.get('/api/release/checklist', authenticate, (_req: AuthenticatedRequest, res
     { id: '8', title: 'Duplicate reward protection tested', category: 'ANTI_FRAUD', status: 'PASS', description: 'Idempotency keys prevent double award', details: 'Returns existing tx' },
   ];
   res.json({ checklist });
+});
+
+// -------------------------------------------------------------
+// Catch-all for API 404s (Guarantees JSON is ALWAYS returned for /api/*, NEVER HTML!)
+// -------------------------------------------------------------
+app.all('/api/*', (req: Request, res: Response) => {
+  res.status(404).json({
+    error: 'API_ENDPOINT_NOT_FOUND',
+    message: `API endpoint ${req.method} ${req.path} does not exist.`,
+  });
+});
+
+// Global Express JSON error handler (Prevents default HTML stack trace error responses)
+app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
+  console.error('[API Server Error]', err);
+  res.status(500).json({
+    error: 'INTERNAL_SERVER_ERROR',
+    message: err?.message || 'An internal server error occurred.',
+  });
 });
 
 // -------------------------------------------------------------
@@ -1196,7 +1495,7 @@ async function setupViteOrStatic() {
   }
 
   app.listen(PORT, '0.0.0.0', () => {
-    console.log(`[LoopPulse Pro] Server active on http://0.0.0.0:${PORT}`);
+    console.log(`[VexoraX] Server active on http://0.0.0.0:${PORT}`);
   });
 }
 

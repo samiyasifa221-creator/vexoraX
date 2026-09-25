@@ -60,7 +60,7 @@ export interface Translations {
 
 export const translations: Record<SupportedLanguage, Translations> = {
   en: {
-    appName: 'LoopPulse Pro',
+    appName: 'VexoraX',
     welcomeBack: 'Welcome Back',
     premiumUser: 'PREMIUM USER',
     yourBalance: 'YOUR BALANCE',
@@ -117,7 +117,7 @@ export const translations: Record<SupportedLanguage, Translations> = {
     englishFlag: 'English',
   },
   bn: {
-    appName: 'লুপপালস প্রো',
+    appName: 'VexoraX',
     welcomeBack: 'স্বাগতম',
     premiumUser: 'প্রিমিয়াম ইউজার',
     yourBalance: 'আপনার ব্যালেন্স',

@@ -41,7 +41,7 @@ export class InMemoryStore {
   // App Configuration (Sections 14, 15, 27)
   public appConfig: AppConfig = {
     minimumDailyTasksRequired: 50,
-    enforceDailyTaskRequirement: false, // Default false for smooth demo, toggleable in admin
+    enforceDailyTaskRequirement: false, // Toggleable in admin
     maintenanceMode: false,
     appVersion: '1.2.0',
     minSupportedVersion: '1.0.0',
@@ -134,12 +134,16 @@ export class InMemoryStore {
   }
 
   // -------------------------------------------------------------
-  // Section 13: Fair Link Rotation Algorithm
+  // Fair Link Rotation Algorithm & Real Ad Management
   // -------------------------------------------------------------
-  public getNextEligibleLink(type: 'Adsterra' | 'Blogger' = 'Blogger'): UserLink | null {
-    const allLinks = Array.from(this.userLinks.values()).filter(
-      (l) => l.type === type && l.status === 'ACTIVE' && l.completedViews < l.targetViews
+  public getNextEligibleLink(type?: string): UserLink | null {
+    let allLinks = Array.from(this.userLinks.values()).filter(
+      (l) => (!type || l.type === type) && l.status === 'ACTIVE' && l.completedViews < l.targetViews
     );
+
+    if (allLinks.length === 0) {
+      allLinks = Array.from(this.userLinks.values()).filter((l) => l.status === 'ACTIVE');
+    }
 
     if (allLinks.length === 0) return null;
 
@@ -157,6 +161,22 @@ export class InMemoryStore {
     selected.serveCount++;
     selected.lastServedAt = new Date().toISOString();
     return selected;
+  }
+
+  public addTaskDefinition(task: TaskDefinition): void {
+    this.taskDefinitions.set(task.id, task);
+  }
+
+  public updateTaskDefinition(taskId: string, updates: Partial<TaskDefinition>): TaskDefinition | null {
+    const existing = this.taskDefinitions.get(taskId);
+    if (!existing) return null;
+    const updated = { ...existing, ...updates };
+    this.taskDefinitions.set(taskId, updated);
+    return updated;
+  }
+
+  public deleteTaskDefinition(taskId: string): boolean {
+    return this.taskDefinitions.delete(taskId);
   }
 
   public recordLinkView(linkId: string): { completed: boolean; completedViews: number; targetViews: number } | null {
@@ -311,10 +331,7 @@ export class InMemoryStore {
     this.blockedDevices.add('dev_farm_emul_9994');
 
     // -------------------------------------------------------------
-    // Section 8: EXACTLY 3 Work Center Task Options
-    // Task 1: Adsterra 8-Ad Auto Stream (400s Continuous Loop & 5-Min Cooldown)
-    // Task 2: Blogger View
-    // Task 3: Third Task (CONFIGURABLE by Admin!)
+    // Work Center Tasks: Customizable, Editable, Deletable & Addable Ads/Tasks
     // -------------------------------------------------------------
     const initialTasks: TaskDefinition[] = [
       {
@@ -324,6 +341,7 @@ export class InMemoryStore {
         title: 'Adsterra 8-Ad Auto Stream (400s Loop)',
         description: 'Continuous 8-ad auto-play loop for 400 seconds • 5-minute break period.',
         category: 'ADSTERRA',
+        url: 'https://unlikelycharitablewanting.com/yq26ub6cn?key=2de33b5349b5825fabf2823dca90c5d1',
         reward: 450,
         rewardPoints: 450,
         cooldownSeconds: 300, // 5 minutes (300 seconds) required rest period
@@ -340,6 +358,7 @@ export class InMemoryStore {
         title: 'Blogger View',
         description: 'Steady rewards • Easy tasks. Fairly view member campaign links.',
         category: 'BLOGGER',
+        url: 'https://unlikelycharitablewanting.com/yq26ub6cn?key=2de33b5349b5825fabf2823dca90c5d1',
         reward: 95,
         rewardPoints: 95,
         cooldownSeconds: 20,
@@ -356,6 +375,7 @@ export class InMemoryStore {
         title: 'Sponsored Partner Quest',
         description: 'Interactive app discovery and research mission. Managed via Admin.',
         category: 'CONFIGURABLE_CUSTOM',
+        url: 'https://unlikelycharitablewanting.com/yq26ub6cn?key=2de33b5349b5825fabf2823dca90c5d1',
         reward: 160,
         rewardPoints: 160,
         cooldownSeconds: 45,
@@ -370,14 +390,12 @@ export class InMemoryStore {
     initialTasks.forEach((t) => this.taskDefinitions.set(t.id, t));
 
     // -------------------------------------------------------------
-    // Section 11, 12, 13: Seed Alex Vance's EXACT 8 Campaign Links!
-    // 1. Link #1: Provided Adsterra Direct Link (Live Preview)
-    // 2-8: 7 Additional rotating links for the 8-Ad Continuous Loop
+    // Real Active Ad Campaign Links (No fake/demo links!)
     // -------------------------------------------------------------
     const seedLinks: Array<{
       id: string;
       url: string;
-      type: 'Adsterra' | 'Blogger';
+      type: 'Adsterra' | 'Blogger' | 'DirectLink';
       title: string;
       completedViews: number;
       targetViews: number;
@@ -389,69 +407,6 @@ export class InMemoryStore {
         type: 'Adsterra',
         title: 'Adsterra Direct Link #1 (Primary)',
         completedViews: 12,
-        targetViews: 50,
-        status: 'ACTIVE',
-      },
-      {
-        id: 'lnk_alex_02',
-        url: 'https://techpulse.blog/ai-future-trends',
-        type: 'Blogger',
-        title: 'TechPulse AI Future Trends',
-        completedViews: 21,
-        targetViews: 50,
-        status: 'ACTIVE',
-      },
-      {
-        id: 'lnk_alex_03',
-        url: 'https://gadgetreview.io/pixel-9-pro-spec',
-        type: 'Blogger',
-        title: 'Pixel 9 Pro Deep Review',
-        completedViews: 35,
-        targetViews: 50,
-        status: 'ACTIVE',
-      },
-      {
-        id: 'lnk_alex_04',
-        url: 'https://monetizefast.net/smart-link-offer',
-        type: 'Adsterra',
-        title: 'MonetizeFast Direct Link',
-        completedViews: 18,
-        targetViews: 50,
-        status: 'ACTIVE',
-      },
-      {
-        id: 'lnk_alex_05',
-        url: 'https://cryptoinsider.org/solana-defi-guide',
-        type: 'Blogger',
-        title: 'Solana DeFi Guide 2026',
-        completedViews: 7,
-        targetViews: 50,
-        status: 'ACTIVE',
-      },
-      {
-        id: 'lnk_alex_06',
-        url: 'https://travelsmart.com/best-destinations',
-        type: 'Blogger',
-        title: 'Budget Travel Destinations',
-        completedViews: 30,
-        targetViews: 50,
-        status: 'ACTIVE',
-      },
-      {
-        id: 'lnk_alex_07',
-        url: 'https://adsterra-smartlink.biz/direct/stream7',
-        type: 'Adsterra',
-        title: 'High-CPM Smartlink Stream',
-        completedViews: 25,
-        targetViews: 50,
-        status: 'ACTIVE',
-      },
-      {
-        id: 'lnk_alex_08',
-        url: 'https://gamedevnews.org/unreal-engine-6-preview',
-        type: 'Blogger',
-        title: 'Unreal Engine 6 Interactive',
-        completedViews: 18,
         targetViews: 50,
         status: 'ACTIVE',
       },

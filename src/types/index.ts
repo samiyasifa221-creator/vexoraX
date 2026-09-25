@@ -53,7 +53,7 @@ export interface UserProfile {
   notes?: string[];
 }
 
-export type LinkType = 'Adsterra' | 'Blogger';
+export type LinkType = 'Adsterra' | 'Blogger' | 'DirectLink' | 'Banner' | 'Video';
 export type LinkStatus = 'ACTIVE' | 'INACTIVE' | 'COMPLETED';
 
 export interface UserLink {
@@ -98,11 +98,12 @@ export interface CampaignPackage {
 
 export interface TaskDefinition {
   id: string;
-  taskIndex: 1 | 2 | 3;
+  taskIndex: number;
   name: string;
   title: string;
   description: string;
-  category: 'ADSTERRA' | 'BLOGGER' | 'CONFIGURABLE_CUSTOM';
+  category: 'ADSTERRA' | 'BLOGGER' | 'CONFIGURABLE_CUSTOM' | 'DIRECT_LINK' | 'BANNER' | 'VIDEO';
+  url?: string;
   reward: number;
   rewardPoints: number;
   cooldownSeconds: number;

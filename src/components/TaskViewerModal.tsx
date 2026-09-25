@@ -27,6 +27,7 @@ import {
 } from 'lucide-react';
 import { TaskDefinition, SupportedLanguage, UserLink } from '../types/index.js';
 import { translations } from '../utils/i18n.js';
+import { openExternalUrl } from '../utils/browser.js';
 
 interface TaskViewerModalProps {
   isOpen: boolean;
@@ -47,81 +48,16 @@ interface AdItem {
   targetViews?: number;
 }
 
-// Default 8-Ad Playlist fallback with user's provided link as #1
-const DEFAULT_8_ADS: AdItem[] = [
-  {
-    id: 'lnk_alex_01',
-    index: 1,
-    url: 'https://unlikelycharitablewanting.com/yq26ub6cn?key=2de33b5349b5825fabf2823dca90c5d1',
-    title: 'Adsterra Direct Link #1 (Primary)',
-    type: 'Adsterra',
-    completedViews: 12,
-    targetViews: 50,
-  },
-  {
-    id: 'lnk_alex_02',
-    index: 2,
-    url: 'https://techpulse.blog/ai-future-trends',
-    title: 'TechPulse AI Future Trends',
-    type: 'Blogger',
-    completedViews: 21,
-    targetViews: 50,
-  },
-  {
-    id: 'lnk_alex_03',
-    index: 3,
-    url: 'https://gadgetreview.io/pixel-9-pro-spec',
-    title: 'Pixel 9 Pro Deep Review',
-    type: 'Blogger',
-    completedViews: 35,
-    targetViews: 50,
-  },
-  {
-    id: 'lnk_alex_04',
-    index: 4,
-    url: 'https://monetizefast.net/smart-link-offer',
-    title: 'MonetizeFast Direct Link',
-    type: 'Adsterra',
-    completedViews: 18,
-    targetViews: 50,
-  },
-  {
-    id: 'lnk_alex_05',
-    index: 5,
-    url: 'https://cryptoinsider.org/solana-defi-guide',
-    title: 'Solana DeFi Guide 2026',
-    type: 'Blogger',
-    completedViews: 7,
-    targetViews: 50,
-  },
-  {
-    id: 'lnk_alex_06',
-    index: 6,
-    url: 'https://travelsmart.com/best-destinations',
-    title: 'Budget Travel Destinations',
-    type: 'Blogger',
-    completedViews: 30,
-    targetViews: 50,
-  },
-  {
-    id: 'lnk_alex_07',
-    index: 7,
-    url: 'https://adsterra-smartlink.biz/direct/stream7',
-    title: 'High-CPM Smartlink Stream',
-    type: 'Adsterra',
-    completedViews: 25,
-    targetViews: 50,
-  },
-  {
-    id: 'lnk_alex_08',
-    index: 8,
-    url: 'https://gamedevnews.org/unreal-engine-6-preview',
-    title: 'Unreal Engine 6 Interactive',
-    type: 'Blogger',
-    completedViews: 18,
-    targetViews: 50,
-  },
-];
+// Default Real Adsterra link fallback (NO FAKE / DEMO DOMAINS)
+const DEFAULT_REAL_AD: AdItem = {
+  id: 'ad_real_primary',
+  index: 1,
+  url: 'https://unlikelycharitablewanting.com/yq26ub6cn?key=2de33b5349b5825fabf2823dca90c5d1',
+  title: 'Adsterra Direct Link (Live CPM Stream)',
+  type: 'Adsterra',
+  completedViews: 0,
+  targetViews: 1000,
+};
 
 export const TaskViewerModal: React.FC<TaskViewerModalProps> = ({
   isOpen,
@@ -153,8 +89,8 @@ export const TaskViewerModal: React.FC<TaskViewerModalProps> = ({
     'INITIAL' | 'VIEWING' | 'READY_TO_CLAIM' | 'CLAIMING' | 'BREAK_TIME' | 'BREAK_COMPLETED'
   >('INITIAL');
 
-  // 8-Ad Playlist state
-  const [playlist, setPlaylist] = useState<AdItem[]>(DEFAULT_8_ADS);
+  // Real Ad Playlist state
+  const [playlist, setPlaylist] = useState<AdItem[]>([DEFAULT_REAL_AD]);
   const [currentAdIndex, setCurrentAdIndex] = useState(0);
   const [isAutoPlay, setIsAutoPlay] = useState(true);
   const [copiedUrl, setCopiedUrl] = useState(false);
@@ -249,7 +185,14 @@ export const TaskViewerModal: React.FC<TaskViewerModalProps> = ({
         }),
       });
 
-      const data = await res.json();
+      const contentType = res.headers.get('content-type');
+      let data: any = {};
+      if (contentType && contentType.includes('application/json')) {
+        data = await res.json();
+      } else {
+        data = { message: await res.text() };
+      }
+
       if (!res.ok) {
         throw new Error(data.message || 'Failed to start task session.');
       }
@@ -257,8 +200,18 @@ export const TaskViewerModal: React.FC<TaskViewerModalProps> = ({
       setSession(data);
       if (data.playlist && Array.isArray(data.playlist) && data.playlist.length > 0) {
         setPlaylist(data.playlist);
+      } else if (task.url) {
+        setPlaylist([
+          {
+            id: `task_${task.id}`,
+            index: 1,
+            url: task.url,
+            title: task.title,
+            type: task.category,
+          },
+        ]);
       } else {
-        setPlaylist(DEFAULT_8_ADS);
+        setPlaylist([DEFAULT_REAL_AD]);
       }
       setStep('VIEWING');
     } catch (err: any) {
@@ -295,7 +248,14 @@ export const TaskViewerModal: React.FC<TaskViewerModalProps> = ({
         }),
       });
 
-      const data = await res.json();
+      const contentType = res.headers.get('content-type');
+      let data: any = {};
+      if (contentType && contentType.includes('application/json')) {
+        data = await res.json();
+      } else {
+        data = { message: await res.text() };
+      }
+
       if (!res.ok) {
         throw new Error(data.message || 'Verification rejected by anti-fraud engine.');
       }
@@ -343,7 +303,7 @@ export const TaskViewerModal: React.FC<TaskViewerModalProps> = ({
   };
 
   const copyCurrentAdUrl = () => {
-    const currentAd = playlist[currentAdIndex] || DEFAULT_8_ADS[0];
+    const currentAd = playlist[currentAdIndex] || playlist[0] || DEFAULT_REAL_AD;
     navigator.clipboard.writeText(currentAd.url);
     setCopiedUrl(true);
     setTimeout(() => setCopiedUrl(false), 2000);
@@ -351,7 +311,7 @@ export const TaskViewerModal: React.FC<TaskViewerModalProps> = ({
 
   if (!isOpen || !task) return null;
 
-  const currentAd = playlist[currentAdIndex] || DEFAULT_8_ADS[0];
+  const currentAd = playlist[currentAdIndex] || playlist[0] || DEFAULT_REAL_AD;
   const progressPercent = Math.min(100, Math.round((elapsedMs / totalDurationMs) * 100));
   const remainingTotalSec = Math.max(0, Math.ceil((totalDurationMs - elapsedMs) / 1000));
   const currentAdElapsedSec = Math.floor((elapsedMs % perAdDurationMs) / 1000);
@@ -592,15 +552,13 @@ export const TaskViewerModal: React.FC<TaskViewerModalProps> = ({
                     {copiedUrl ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
                     <span>{copiedUrl ? 'Copied' : 'Copy'}</span>
                   </button>
-                  <a
-                    href={currentAd.url}
-                    target="_blank"
-                    rel="noreferrer"
+                  <button
+                    onClick={() => openExternalUrl(currentAd.url)}
                     className="p-1 px-2 rounded bg-purple-600 hover:bg-purple-500 text-white font-bold text-[10px] flex items-center gap-1 transition-colors"
                   >
                     <ExternalLink className="w-3 h-3" />
                     <span>Open Direct</span>
-                  </a>
+                  </button>
                 </div>
               </div>
 
@@ -657,14 +615,12 @@ export const TaskViewerModal: React.FC<TaskViewerModalProps> = ({
                       Live Stream Active • Auto-cycling 8 ads across 400 seconds
                     </span>
                   </div>
-                  <a
-                    href={currentAd.url}
-                    target="_blank"
-                    rel="noreferrer"
+                  <button
+                    onClick={() => openExternalUrl(currentAd.url)}
                     className="text-purple-400 hover:text-purple-300 font-bold shrink-0 ml-2 flex items-center gap-0.5"
                   >
                     Direct View <ChevronRight className="w-3 h-3" />
-                  </a>
+                  </button>
                 </div>
               </div>
             </div>

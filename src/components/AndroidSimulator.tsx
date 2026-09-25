@@ -39,6 +39,7 @@ import { WorkCenterScreen } from './WorkCenterScreen.js';
 import { ProfileScreen } from './ProfileScreen.js';
 import { Navigation, TabType } from './Navigation.js';
 import { SplashScreen } from './SplashScreen.js';
+import { Capacitor } from '@capacitor/core';
 
 interface AndroidSimulatorProps {
   user: UserProfile;
@@ -60,6 +61,7 @@ export const AndroidSimulator: React.FC<AndroidSimulatorProps> = ({
   const [currentTab, setCurrentTab] = useState<TabType>('home');
   const [profileInitialSection, setProfileInitialSection] = useState<string>('overview');
   const [lang, setLang] = useState<SupportedLanguage>('en');
+  const [isFullscreen, setIsFullscreen] = useState(Capacitor.isNativePlatform());
 
   // Realtime Analytics & App Config
   const [analytics, setAnalytics] = useState<RealtimeAnalytics>({
@@ -105,7 +107,7 @@ export const AndroidSimulator: React.FC<AndroidSimulatorProps> = ({
       const res = await fetch('/api/realtime/analytics', {
         headers: { Authorization: `Bearer ${token}` },
       });
-      if (res.ok) {
+      if (res.ok && res.headers.get('content-type')?.includes('application/json')) {
         const data = await res.json();
         if (data.analytics) setAnalytics(data.analytics);
       }
@@ -119,7 +121,7 @@ export const AndroidSimulator: React.FC<AndroidSimulatorProps> = ({
       const res = await fetch('/api/app/config', {
         headers: { Authorization: `Bearer ${token}` },
       });
-      if (res.ok) {
+      if (res.ok && res.headers.get('content-type')?.includes('application/json')) {
         const data = await res.json();
         if (data.config) setConfig(data.config);
       }
@@ -133,7 +135,7 @@ export const AndroidSimulator: React.FC<AndroidSimulatorProps> = ({
       const res = await fetch('/api/ledger/history', {
         headers: { Authorization: `Bearer ${token}` },
       });
-      if (res.ok) {
+      if (res.ok && res.headers.get('content-type')?.includes('application/json')) {
         const data = await res.json();
         setRecentTransactions(data.transactions || []);
       }
@@ -211,7 +213,13 @@ export const AndroidSimulator: React.FC<AndroidSimulatorProps> = ({
         body: JSON.stringify(payload),
       });
 
-      const data = await res.json();
+      const contentType = res.headers.get('content-type');
+      let data: any = {};
+      if (contentType && contentType.includes('application/json')) {
+        data = await res.json();
+      } else {
+        data = { message: await res.text() };
+      }
       setAttackTesting(false);
 
       if (data.idempotentReplay) {
@@ -253,9 +261,9 @@ export const AndroidSimulator: React.FC<AndroidSimulatorProps> = ({
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h2 className="text-base font-bold text-white">LoopPulse Pro — Android App &amp; Security Lab</h2>
+              <h2 className="text-base font-bold text-white">VexoraX — Android App &amp; Security Lab</h2>
               <span className="text-[10px] bg-purple-500/20 text-purple-300 border border-purple-500/30 px-2 py-0.5 rounded-full font-bold uppercase">
-                v1.2.0 (API 35)
+                v1.0.0 (API 35/36)
               </span>
             </div>
             <p className="text-xs text-slate-300 mt-0.5">
@@ -264,8 +272,16 @@ export const AndroidSimulator: React.FC<AndroidSimulatorProps> = ({
           </div>
         </div>
 
-        {/* Persona quick switch */}
-        <div className="flex items-center gap-2 bg-slate-900/90 border border-slate-800 p-1.5 rounded-xl text-xs">
+        {/* Persona quick switch & View Mode */}
+        <div className="flex flex-wrap items-center gap-2 bg-slate-900/90 border border-slate-800 p-1.5 rounded-xl text-xs">
+          <button
+            onClick={() => setIsFullscreen(!isFullscreen)}
+            className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 transition-colors"
+            title="Toggle Fullscreen Native Layout"
+          >
+            {isFullscreen ? <Minimize2 className="w-3.5 h-3.5 text-purple-400" /> : <Maximize2 className="w-3.5 h-3.5 text-purple-400" />}
+            <span className="text-xs font-semibold">{isFullscreen ? 'Chassis Mode' : 'Full Screen'}</span>
+          </button>
           <span className="text-slate-400 pl-1 font-medium hidden sm:inline">Active Persona:</span>
           <button
             onClick={() => onSwitchUser('alex')}
@@ -305,25 +321,34 @@ export const AndroidSimulator: React.FC<AndroidSimulatorProps> = ({
         {/* ========================================================================= */}
         {/* ANDROID DEVICE CHASSIS (LEFT COLUMN - 7 COLS) */}
         {/* ========================================================================= */}
-        <div className="mx-auto w-full flex justify-center lg:col-span-7">
-          <div className="relative w-full max-w-[420px] bg-slate-950 rounded-[44px] p-3 shadow-2xl shadow-purple-950/30 border-4 border-slate-800">
-            {/* Outer Bezel & Speaker / Camera Notch */}
-            <div className="absolute top-6 left-1/2 -translate-x-1/2 w-32 h-4 bg-slate-900 rounded-full flex items-center justify-center gap-2 z-30 pointer-events-none">
-              <div className="w-2.5 h-2.5 rounded-full bg-slate-950 border border-slate-800"></div>
-              <div className="w-10 h-1.5 rounded-full bg-slate-800"></div>
-            </div>
+        <div className={`mx-auto w-full flex justify-center ${isFullscreen ? 'lg:col-span-12' : 'lg:col-span-7'}`}>
+          <div className={isFullscreen || Capacitor.isNativePlatform() 
+            ? "relative w-full max-w-md bg-slate-950 rounded-3xl p-1.5 shadow-2xl border border-slate-800"
+            : "relative w-full max-w-[420px] bg-slate-950 rounded-[44px] p-3 shadow-2xl shadow-purple-950/30 border-4 border-slate-800"}>
+            
+            {/* Outer Bezel & Speaker / Camera Notch only on chassis mode */}
+            {!isFullscreen && !Capacitor.isNativePlatform() && (
+              <>
+                <div className="absolute top-6 left-1/2 -translate-x-1/2 w-32 h-4 bg-slate-900 rounded-full flex items-center justify-center gap-2 z-30 pointer-events-none">
+                  <div className="w-2.5 h-2.5 rounded-full bg-slate-950 border border-slate-800"></div>
+                  <div className="w-10 h-1.5 rounded-full bg-slate-800"></div>
+                </div>
 
-            {/* Android Device Status Bar */}
-            <div className="h-6 bg-slate-950 rounded-t-[36px] flex items-center justify-between px-6 pt-1 text-[11px] text-slate-400 font-medium select-none z-20">
-              <span>9:41 AM</span>
-              <div className="flex items-center gap-1.5">
-                <span className="text-[10px] font-mono text-purple-400">5G</span>
-                <span className="text-[10px]">100%</span>
-              </div>
-            </div>
+                {/* Android Device Status Bar */}
+                <div className="h-6 bg-slate-950 rounded-t-[36px] flex items-center justify-between px-6 pt-1 text-[11px] text-slate-400 font-medium select-none z-20">
+                  <span>9:41 AM</span>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[10px] font-mono text-purple-400">5G</span>
+                    <span className="text-[10px]">100%</span>
+                  </div>
+                </div>
+              </>
+            )}
 
-            {/* Screen Viewport Container (Fixed Aspect Ratio with Smooth Scroll) */}
-            <div className="relative w-full h-[760px] bg-slate-950 rounded-[34px] overflow-hidden flex flex-col border border-slate-800/80">
+            {/* Screen Viewport Container */}
+            <div className={`relative w-full bg-slate-950 overflow-hidden flex flex-col border border-slate-800/80 ${
+              isFullscreen || Capacitor.isNativePlatform() ? 'rounded-2xl min-h-[720px]' : 'h-[760px] rounded-[34px]'
+            }`}>
               {showSplash ? (
                 <SplashScreen onComplete={() => setShowSplash(false)} lang={lang} />
               ) : (
@@ -394,16 +419,19 @@ export const AndroidSimulator: React.FC<AndroidSimulatorProps> = ({
             </div>
 
             {/* Phone Home Bar Pill */}
-            <div className="h-5 flex items-center justify-center pt-1">
-              <div className="w-32 h-1 bg-slate-700/80 rounded-full"></div>
-            </div>
+            {!isFullscreen && !Capacitor.isNativePlatform() && (
+              <div className="h-5 flex items-center justify-center pt-1">
+                <div className="w-32 h-1 bg-slate-700/80 rounded-full"></div>
+              </div>
+            )}
           </div>
         </div>
 
         {/* ========================================================================= */}
-        {/* ATTACK LAB & REAL-TIME LEDGER (RIGHT COLUMN - 5 COLS) */}
+        {/* ATTACK LAB & REAL-TIME LEDGER (RIGHT COLUMN - hidden on native) */}
         {/* ========================================================================= */}
-        <div className="space-y-5 lg:col-span-5">
+        {!Capacitor.isNativePlatform() && (
+          <div className={`space-y-5 ${isFullscreen ? 'lg:col-span-12' : 'lg:col-span-5'}`}>
           {/* Attack Simulator Card */}
           <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-5 space-y-4">
             <div className="flex items-center justify-between">
@@ -565,6 +593,7 @@ export const AndroidSimulator: React.FC<AndroidSimulatorProps> = ({
             </p>
           </div>
         </div>
+        )}
       </div>
     </div>
   );
