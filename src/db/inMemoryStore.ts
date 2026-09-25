@@ -53,10 +53,10 @@ export class InMemoryStore {
       buyCoin: true,
     },
     campaignPackages: [
-      { id: 'pkg_50', targetViews: 50, pointsCost: 90, label: '50 Views Target' },
-      { id: 'pkg_100', targetViews: 100, pointsCost: 180, label: '100 Views Target', isPopular: true },
-      { id: 'pkg_150', targetViews: 150, pointsCost: 320, label: '150 Views Target' },
-      { id: 'pkg_200', targetViews: 200, pointsCost: 450, label: '200 Views Target' },
+      { id: 'pkg_50', targetViews: 50, pointsCost: 50, label: '50 Impressions Target' },
+      { id: 'pkg_100', targetViews: 100, pointsCost: 100, label: '100 Impressions Target', isPopular: true },
+      { id: 'pkg_150', targetViews: 150, pointsCost: 150, label: '150 Impressions Target' },
+      { id: 'pkg_200', targetViews: 200, pointsCost: 200, label: '200 Impressions Target' },
     ],
   };
 
@@ -330,6 +330,54 @@ export class InMemoryStore {
     this.userPasswords.set(hackerUid, { hash: hackerPassHash, salt: hackerSalt });
     this.blockedDevices.add('dev_farm_emul_9994');
 
+    // 4. Additional Active Community Users (Seed pool for 20-ad rotation)
+    const communityUsers = [
+      { uid: 'usr_sarah_102', name: 'Sarah Jenkins', email: 'sarah.j@loopad.net', role: 'user' as const },
+      { uid: 'usr_karim_903', name: 'Karim Rahman', email: 'karim.ads@trafficpulse.org', role: 'user' as const },
+      { uid: 'usr_tanvir_441', name: 'Tanvir Hossain', email: 'tanvir.dev@adclicker.io', role: 'user' as const },
+      { uid: 'usr_elena_512', name: 'Elena Rostova', email: 'elena.blogger@webpulse.co', role: 'user' as const },
+      { uid: 'usr_david_604', name: 'David Miller', email: 'david.media@cpmboost.net', role: 'user' as const },
+      { uid: 'usr_priya_773', name: 'Priya Sharma', email: 'priya.sharma@digitalflow.in', role: 'user' as const },
+      { uid: 'usr_rahul_321', name: 'Rahul Sen', email: 'rahul.sen@adboost.org', role: 'user' as const },
+    ];
+
+    communityUsers.forEach((u) => {
+      const uSalt = crypto.randomBytes(16).toString('hex');
+      const uHash = this.hashPassword('UserPass@2026', uSalt).hash;
+      this.users.set(u.uid, {
+        userId: u.uid,
+        uid: u.uid,
+        name: u.name,
+        displayName: u.name,
+        email: u.email,
+        avatar: `https://api.dicebear.com/7.x/identicon/svg?seed=${u.uid}`,
+        avatarUrl: `https://api.dicebear.com/7.x/identicon/svg?seed=${u.uid}`,
+        points: 4500,
+        pointsBalance: 4500,
+        coins: 30,
+        coinsBalance: 30,
+        premium: false,
+        isPremium: false,
+        premiumExpiry: null,
+        referralCode: `REF${u.uid.slice(-4).toUpperCase()}`,
+        referredBy: 'ALEX992',
+        totalEarned: 6500,
+        totalWithdrawn: 2000,
+        status: 'ACTIVE',
+        isSuspended: false,
+        online: true,
+        lastSeen: new Date().toISOString(),
+        lastActiveAt: new Date().toISOString(),
+        emailVerified: true,
+        riskScore: 0,
+        role: u.role,
+        dailyTasksCompleted: 24,
+        createdAt: '2026-03-01T12:00:00.000Z',
+        notes: ['Verified community publisher'],
+      });
+      this.userPasswords.set(u.uid, { hash: uHash, salt: uSalt });
+    });
+
     // -------------------------------------------------------------
     // Work Center Tasks: Customizable, Editable, Deletable & Addable Ads/Tasks
     // -------------------------------------------------------------
@@ -337,63 +385,64 @@ export class InMemoryStore {
       {
         id: 'task_adsterra_impression',
         taskIndex: 1,
-        name: 'Adsterra 8-Ad Auto Stream',
-        title: 'Adsterra 8-Ad Auto Stream (400s Loop)',
-        description: 'Continuous 8-ad auto-play loop for 400 seconds • 5-minute break period.',
+        name: 'Adsterra 20-Ad Auto Stream',
+        title: 'Adsterra 20-Ad Auto Stream (20s Per Ad)',
+        description: 'Continuous 20-ad auto-play loop (20s per ad • 30 Points per Ad View) • 5-minute break period.',
         category: 'ADSTERRA',
         url: 'https://unlikelycharitablewanting.com/yq26ub6cn?key=2de33b5349b5825fabf2823dca90c5d1',
-        reward: 450,
-        rewardPoints: 450,
+        reward: 30,
+        rewardPoints: 30,
         cooldownSeconds: 300, // 5 minutes (300 seconds) required rest period
         dailyLimit: 25,
         icon: 'Sparkles',
         isActive: true,
-        minDurationSeconds: 400,
-        requiredDurationMs: 400000, // 400 seconds duration
+        minDurationSeconds: 20,
+        requiredDurationMs: 400000, // 400 seconds full cycle (claimable 30 pts per 20s ad)
       },
       {
         id: 'task_blogger_view',
         taskIndex: 2,
         name: 'Blogger View',
-        title: 'Blogger View',
-        description: 'Steady rewards • Easy tasks. Fairly view member campaign links.',
+        title: 'Blogger View (30 Points)',
+        description: 'Steady rewards • 30 Points per 20s ad view.',
         category: 'BLOGGER',
         url: 'https://unlikelycharitablewanting.com/yq26ub6cn?key=2de33b5349b5825fabf2823dca90c5d1',
-        reward: 95,
-        rewardPoints: 95,
+        reward: 30,
+        rewardPoints: 30,
         cooldownSeconds: 20,
         dailyLimit: 40,
         icon: 'Globe',
         isActive: true,
-        minDurationSeconds: 8,
-        requiredDurationMs: 8000,
+        minDurationSeconds: 20,
+        requiredDurationMs: 20000,
       },
       {
         id: 'task_configurable_third',
         taskIndex: 3,
         name: 'Sponsored Partner Quest',
-        title: 'Sponsored Partner Quest',
-        description: 'Interactive app discovery and research mission. Managed via Admin.',
+        title: 'Sponsored Partner Quest (30 Points)',
+        description: 'Interactive app discovery and research mission • 30 Points reward.',
         category: 'CONFIGURABLE_CUSTOM',
         url: 'https://unlikelycharitablewanting.com/yq26ub6cn?key=2de33b5349b5825fabf2823dca90c5d1',
-        reward: 160,
-        rewardPoints: 160,
+        reward: 30,
+        rewardPoints: 30,
         cooldownSeconds: 45,
         dailyLimit: 15,
         icon: 'Rocket',
         isActive: true,
-        minDurationSeconds: 12,
-        requiredDurationMs: 12000,
+        minDurationSeconds: 20,
+        requiredDurationMs: 20000,
       },
     ];
 
     initialTasks.forEach((t) => this.taskDefinitions.set(t.id, t));
 
     // -------------------------------------------------------------
-    // Real Active Ad Campaign Links (No fake/demo links!)
+    // Real Active Ad Campaign Links (Max 8 ads per user enforced)
     // -------------------------------------------------------------
     const seedLinks: Array<{
       id: string;
+      userId: string;
       url: string;
       type: 'Adsterra' | 'Blogger' | 'DirectLink';
       title: string;
@@ -401,13 +450,162 @@ export class InMemoryStore {
       targetViews: number;
       status: 'ACTIVE' | 'COMPLETED';
     }> = [
+      // Alex's link (1 of max 8)
       {
         id: 'lnk_alex_01',
+        userId: alexUid,
         url: 'https://unlikelycharitablewanting.com/yq26ub6cn?key=2de33b5349b5825fabf2823dca90c5d1',
         type: 'Adsterra',
-        title: 'Adsterra Direct Link #1 (Primary)',
+        title: 'Adsterra Direct Link #1 (Alex)',
         completedViews: 12,
         targetViews: 50,
+        status: 'ACTIVE',
+      },
+      // Sarah's links (other user)
+      {
+        id: 'lnk_sarah_01',
+        userId: 'usr_sarah_102',
+        url: 'https://unlikelycharitablewanting.com/yq26ub6cn?key=2de33b5349b5825fabf2823dca90c5d1',
+        type: 'Adsterra',
+        title: 'Tech Gadgets 2026 Direct Offer (Sarah)',
+        completedViews: 15,
+        targetViews: 60,
+        status: 'ACTIVE',
+      },
+      {
+        id: 'lnk_sarah_02',
+        userId: 'usr_sarah_102',
+        url: 'https://unlikelycharitablewanting.com/yq26ub6cn?key=2de33b5349b5825fabf2823dca90c5d1',
+        type: 'Blogger',
+        title: 'Smart Home Automation Blog (Sarah)',
+        completedViews: 20,
+        targetViews: 50,
+        status: 'ACTIVE',
+      },
+      // Karim's links (other user)
+      {
+        id: 'lnk_karim_01',
+        userId: 'usr_karim_903',
+        url: 'https://unlikelycharitablewanting.com/yq26ub6cn?key=2de33b5349b5825fabf2823dca90c5d1',
+        type: 'Adsterra',
+        title: 'E-Commerce Global Deals CPM (Karim)',
+        completedViews: 28,
+        targetViews: 100,
+        status: 'ACTIVE',
+      },
+      {
+        id: 'lnk_karim_02',
+        userId: 'usr_karim_903',
+        url: 'https://unlikelycharitablewanting.com/yq26ub6cn?key=2de33b5349b5825fabf2823dca90c5d1',
+        type: 'Blogger',
+        title: 'Crypto Market Trends (Karim)',
+        completedViews: 32,
+        targetViews: 75,
+        status: 'ACTIVE',
+      },
+      // Tanvir's links (other user)
+      {
+        id: 'lnk_tanvir_01',
+        userId: 'usr_tanvir_441',
+        url: 'https://unlikelycharitablewanting.com/yq26ub6cn?key=2de33b5349b5825fabf2823dca90c5d1',
+        type: 'Adsterra',
+        title: 'Mobile Gaming Portal Rewards (Tanvir)',
+        completedViews: 18,
+        targetViews: 80,
+        status: 'ACTIVE',
+      },
+      {
+        id: 'lnk_tanvir_02',
+        userId: 'usr_tanvir_441',
+        url: 'https://unlikelycharitablewanting.com/yq26ub6cn?key=2de33b5349b5825fabf2823dca90c5d1',
+        type: 'Blogger',
+        title: 'Web Dev Tutorials Hub (Tanvir)',
+        completedViews: 22,
+        targetViews: 50,
+        status: 'ACTIVE',
+      },
+      // Elena's links (other user)
+      {
+        id: 'lnk_elena_01',
+        userId: 'usr_elena_512',
+        url: 'https://unlikelycharitablewanting.com/yq26ub6cn?key=2de33b5349b5825fabf2823dca90c5d1',
+        type: 'Adsterra',
+        title: 'Fashion & Lifestyle Promo (Elena)',
+        completedViews: 14,
+        targetViews: 60,
+        status: 'ACTIVE',
+      },
+      {
+        id: 'lnk_elena_02',
+        userId: 'usr_elena_512',
+        url: 'https://unlikelycharitablewanting.com/yq26ub6cn?key=2de33b5349b5825fabf2823dca90c5d1',
+        type: 'Blogger',
+        title: 'Travel Explorer Daily Blog (Elena)',
+        completedViews: 19,
+        targetViews: 50,
+        status: 'ACTIVE',
+      },
+      // David's links (other user)
+      {
+        id: 'lnk_david_01',
+        userId: 'usr_david_604',
+        url: 'https://unlikelycharitablewanting.com/yq26ub6cn?key=2de33b5349b5825fabf2823dca90c5d1',
+        type: 'Adsterra',
+        title: 'SaaS Comparison 2026 (David)',
+        completedViews: 25,
+        targetViews: 100,
+        status: 'ACTIVE',
+      },
+      {
+        id: 'lnk_david_02',
+        userId: 'usr_david_604',
+        url: 'https://unlikelycharitablewanting.com/yq26ub6cn?key=2de33b5349b5825fabf2823dca90c5d1',
+        type: 'Blogger',
+        title: 'Cloud DevOps Architecture (David)',
+        completedViews: 11,
+        targetViews: 50,
+        status: 'ACTIVE',
+      },
+      // Priya's links (other user)
+      {
+        id: 'lnk_priya_01',
+        userId: 'usr_priya_773',
+        url: 'https://unlikelycharitablewanting.com/yq26ub6cn?key=2de33b5349b5825fabf2823dca90c5d1',
+        type: 'Adsterra',
+        title: 'Online Learning Masterclasses (Priya)',
+        completedViews: 30,
+        targetViews: 75,
+        status: 'ACTIVE',
+      },
+      {
+        id: 'lnk_priya_02',
+        userId: 'usr_priya_773',
+        url: 'https://unlikelycharitablewanting.com/yq26ub6cn?key=2de33b5349b5825fabf2823dca90c5d1',
+        type: 'Blogger',
+        title: 'Data Science Career Guide (Priya)',
+        completedViews: 16,
+        targetViews: 50,
+        status: 'ACTIVE',
+      },
+      // Rahul's links (other user)
+      {
+        id: 'lnk_rahul_01',
+        userId: 'usr_rahul_321',
+        url: 'https://unlikelycharitablewanting.com/yq26ub6cn?key=2de33b5349b5825fabf2823dca90c5d1',
+        type: 'Adsterra',
+        title: 'Fitness & Health Direct CPM (Rahul)',
+        completedViews: 21,
+        targetViews: 90,
+        status: 'ACTIVE',
+      },
+      {
+        id: 'lnk_rahul_02',
+        userId: 'usr_rahul_321',
+        url: 'https://unlikelycharitablewanting.com/yq26ub6cn?key=2de33b5349b5825fabf2823dca90c5d1',
+        type: 'Blogger',
+        title: 'Healthy Recipes Community (Rahul)',
+        completedViews: 27,
+        targetViews: 80,
         status: 'ACTIVE',
       },
     ];
@@ -415,7 +613,7 @@ export class InMemoryStore {
     seedLinks.forEach((l, idx) => {
       this.userLinks.set(l.id, {
         id: l.id,
-        userId: alexUid,
+        userId: l.userId,
         url: l.url,
         type: l.type,
         campaignType: l.type === 'Adsterra' ? 'Impression Drive' : 'Content Traffic',
@@ -428,6 +626,7 @@ export class InMemoryStore {
         createdAt: '2026-09-20T10:00:00.000Z',
         updatedAt: new Date().toISOString(),
       });
+
     });
 
     // Seed Active Campaign
@@ -443,6 +642,40 @@ export class InMemoryStore {
       createdAt: '2026-09-22T08:00:00.000Z',
       startedAt: '2026-09-22T08:05:00.000Z',
       completedAt: null,
+    });
+
+    // Seed Completed Task Session for Replay Attack demonstration
+    this.taskSessions.set('sess_init_alex_01', {
+      taskSessionId: 'sess_init_alex_01',
+      userId: alexUid,
+      taskId: 'task_adsterra_impression',
+      deviceId: 'dev_pixel8_pro_993',
+      startedAt: '2026-09-24T18:28:00.000Z',
+      startedAtMs: Date.now() - 120000,
+      expiresAt: '2026-09-24T18:45:00.000Z',
+      expiresAtMs: Date.now() + 600000,
+      status: 'COMPLETED',
+      verificationToken: 'valid_completed_token_alex_01',
+      campaignLinkId: 'lnk_alex_01',
+      campaignLinkUrl: 'https://unlikelycharitablewanting.com/yq26ub6cn?key=2de33b5349b5825fabf2823dca90c5d1',
+    });
+
+    // Seed Active In-Progress Task Session for Cryptographic Validation tests
+    const nowActiveMs = Date.now();
+    const activeToken = this.generateTaskToken('sess_active_alex_02', alexUid, 'dev_pixel8_pro_993', nowActiveMs);
+    this.taskSessions.set('sess_active_alex_02', {
+      taskSessionId: 'sess_active_alex_02',
+      userId: alexUid,
+      taskId: 'task_adsterra_impression',
+      deviceId: 'dev_pixel8_pro_993',
+      startedAt: new Date(nowActiveMs).toISOString(),
+      startedAtMs: nowActiveMs,
+      expiresAt: new Date(nowActiveMs + 900000).toISOString(),
+      expiresAtMs: nowActiveMs + 900000,
+      status: 'IN_PROGRESS',
+      verificationToken: activeToken,
+      campaignLinkId: 'lnk_alex_01',
+      campaignLinkUrl: 'https://unlikelycharitablewanting.com/yq26ub6cn?key=2de33b5349b5825fabf2823dca90c5d1',
     });
 
     // Seed Ledger
@@ -574,7 +807,10 @@ export class InMemoryStore {
       }
     }
 
-    // Default dynamic figures matching reference
+    // Live fluctuating online members count (e.g. 58-64) with live heartbeat
+    const liveVariation = (Math.floor(Date.now() / 4000) % 5) - 2; // -2 to +2
+    const liveOnlineCount = Math.max(56, 60 + liveVariation);
+
     return {
       adsterraTasksCompleted: 34 + adsterraCompleted,
       adsterraTasksRemaining: 16,
@@ -582,7 +818,7 @@ export class InMemoryStore {
       bloggerTasksCompleted: 112 + bloggerCompleted,
       bloggerTasksRemaining: 38,
       activeBloggerCampaigns: activeBloggerCamps || 5,
-      onlineMembersCount: 60, // Prompt Section 5: "Online Members: 60"
+      onlineMembersCount: liveOnlineCount,
     };
   }
 

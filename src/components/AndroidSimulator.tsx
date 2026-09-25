@@ -148,6 +148,17 @@ export const AndroidSimulator: React.FC<AndroidSimulatorProps> = ({
     fetchAnalytics();
     fetchConfig();
     fetchLedger();
+
+    // Live continuous polling so Home Screen metrics and balance update in real time
+    const liveTimer = setInterval(() => {
+      fetchAnalytics();
+      fetchLedger();
+      if (typeof onRefreshUser === 'function') {
+        onRefreshUser();
+      }
+    }, 3500);
+
+    return () => clearInterval(liveTimer);
   }, [user.userId, token]);
 
   // -------------------------------------------------------------
@@ -198,8 +209,10 @@ export const AndroidSimulator: React.FC<AndroidSimulatorProps> = ({
       payload.idempotencyKey = 'idem_seed_alex_001';
       payload.taskSessionId = 'sess_init_alex_01';
     } else if (type === 'TOKEN_TAMPER') {
+      payload.taskSessionId = 'sess_active_alex_02';
       payload.verificationToken = 'tampered_signature_9999999999999999';
     } else if (type === 'ROOTED_DEVICE') {
+      payload.taskSessionId = 'sess_active_alex_02';
       payload.appIntegrityToken = 'ROOTED_TAMPERED';
     }
 
@@ -510,6 +523,20 @@ export const AndroidSimulator: React.FC<AndroidSimulatorProps> = ({
                   <Lock className="w-3.5 h-3.5 text-slate-500 group-hover:text-purple-400" />
                 </div>
                 <p className="text-[10px] text-slate-400">HMAC cryptographic corruption</p>
+              </button>
+
+              <button
+                disabled={attackTesting}
+                onClick={() => triggerAttack('ROOTED_DEVICE')}
+                className="p-2.5 rounded-xl bg-slate-850 hover:bg-slate-800 border border-slate-700/80 text-left transition-all group hover:border-rose-500/50 sm:col-span-2"
+              >
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-xs font-bold text-slate-200 group-hover:text-rose-400">
+                    Rooted Device / Play Integrity Bypass
+                  </span>
+                  <ShieldAlert className="w-3.5 h-3.5 text-slate-500 group-hover:text-rose-400" />
+                </div>
+                <p className="text-[10px] text-slate-400">Hardware attestation failure &amp; binary patch detection</p>
               </button>
             </div>
 

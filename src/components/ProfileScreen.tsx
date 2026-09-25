@@ -448,24 +448,57 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
         ))}
       </div>
 
-      {/* 11. ADD YOUR LINKS SECTION */}
+      {/* 11. ADD YOUR LINKS / ADS SECTION (Strict max 8 ads per user) */}
       {activeSection === 'links' && (
         <div className="space-y-4">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <h3 className="text-sm font-extrabold text-white">{t.addYourLinks}</h3>
-              <p className="text-[11px] text-purple-300/80">{t.maxActiveLinksNotice}</p>
+              <div className="flex items-center gap-2">
+                <h3 className="text-sm font-extrabold text-white">
+                  {lang === 'bn' ? 'আপনার অ্যাড ও ক্যাম্পেইন লিংক' : t.addYourLinks}
+                </h3>
+                <span className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded-full border ${
+                  links.length >= 8
+                    ? 'bg-amber-500/20 text-amber-300 border-amber-500/30'
+                    : 'bg-purple-500/20 text-purple-300 border-purple-500/30'
+                }`}>
+                  {links.length} / 8 {lang === 'bn' ? 'টি অ্যাড' : 'Ads'}
+                </span>
+              </div>
+              <p className="text-[11px] text-purple-300/80 mt-0.5">
+                {lang === 'bn'
+                  ? 'প্রত্যেক ব্যবহারকারী সর্বোচ্চ ৮টি অ্যাড যোগ করতে পারবে, এটি বাড়বে না।'
+                  : 'Each user is strictly limited to adding a maximum of 8 ads (this limit cannot increase).'}
+              </p>
             </div>
 
             <button
               onClick={() => setIsAddLinkModalOpen(true)}
-              disabled={activeLinksCount >= 8}
-              className="px-3 py-1.5 bg-purple-600 hover:bg-purple-500 disabled:bg-slate-800 disabled:text-slate-500 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-md shadow-purple-600/30 transition-all"
+              disabled={links.length >= 8}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-md transition-all ${
+                links.length >= 8
+                  ? 'bg-slate-800 text-slate-500 cursor-not-allowed border border-slate-700'
+                  : 'bg-purple-600 hover:bg-purple-500 text-white shadow-purple-600/30 active:scale-95'
+              }`}
             >
               <Plus className="w-3.5 h-3.5" />
-              {t.addNewLink}
+              {links.length >= 8
+                ? (lang === 'bn' ? 'সর্বোচ্চ ৮টি পূর্ণ (সীমা শেষ)' : 'Max 8 Ads Reached')
+                : (lang === 'bn' ? `+ নতুন অ্যাড যোগ করুন (${8 - links.length}টি বাকি)` : `${t.addNewLink} (${8 - links.length} left)`)}
             </button>
           </div>
+
+          {/* Banner when 8 ads limit reached */}
+          {links.length >= 8 && (
+            <div className="p-3 rounded-2xl bg-amber-950/40 border border-amber-500/30 text-amber-200 text-xs flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 text-amber-400 shrink-0" />
+              <span>
+                {lang === 'bn'
+                  ? 'আপনি সর্বোচ্চ ৮টি অ্যাড যোগ করেছেন। নিয়ম অনুযায়ী ব্যবহারকারী প্রতি ৮টির বেশি অ্যাড দেওয়া যাবে না। নতুন অ্যাড যোগ করতে হলে যেকোনো একটি অ্যাড ডিলিট করুন।'
+                  : 'You have reached the maximum allowed 8 ads. Per policy, users cannot add more than 8 ads. Delete an existing ad to add a new one.'}
+              </span>
+            </div>
+          )}
 
           {/* Tabs: All / Adsterra / Blogger */}
           <div className="flex items-center gap-1 bg-slate-900/80 p-1 rounded-xl border border-purple-900/40 w-fit text-xs font-semibold">
@@ -653,13 +686,37 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
             </div>
           </div>
 
-          {/* STEP 2: Choose Target Package */}
+          {/* STEP 2: Choose Target Package (50 points for 50, 100, 150, 200 impressions) */}
           <div className="p-4 bg-slate-900 border border-purple-900/40 rounded-2xl space-y-3">
-            <span className="text-xs font-bold text-white block">{t.selectTargetViews}</span>
+            <div className="flex items-center justify-between">
+              <div>
+                <span className="text-xs font-bold text-white block">{t.selectTargetViews}</span>
+                <span className="text-[11px] text-purple-300">
+                  {lang === 'bn'
+                    ? '৫০ পয়েন্ট দিয়ে ৫০ ইমপ্রেশন নিন (১০০, ১৫০, ২০০ ইমপ্রেশনও উপলব্ধ)'
+                    : 'Get 50 Impressions for 50 Points (100, 150, 200 also available)'}
+                </span>
+              </div>
+              <div className="text-right">
+                <span className="text-[10px] text-slate-400 block uppercase font-bold">Your Balance</span>
+                <span className="text-xs font-mono font-bold text-amber-400">
+                  {(user.pointsBalance ?? user.points).toLocaleString()} pts
+                </span>
+              </div>
+            </div>
 
             <div className="grid grid-cols-2 gap-2.5">
-              {config.campaignPackages.map((pkg) => {
+              {(config.campaignPackages && config.campaignPackages.length > 0
+                ? config.campaignPackages
+                : [
+                    { id: 'pkg_50', targetViews: 50, pointsCost: 50, label: '50 Impressions Target' },
+                    { id: 'pkg_100', targetViews: 100, pointsCost: 100, label: '100 Impressions Target', isPopular: true },
+                    { id: 'pkg_150', targetViews: 150, pointsCost: 150, label: '150 Impressions Target' },
+                    { id: 'pkg_200', targetViews: 200, pointsCost: 200, label: '200 Impressions Target' },
+                  ]
+              ).map((pkg) => {
                 const isSelected = selectedTargetViews === pkg.targetViews;
+                const canAfford = (user.pointsBalance ?? user.points) >= pkg.pointsCost;
                 return (
                   <button
                     key={pkg.id}
@@ -667,7 +724,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                     onClick={() => setSelectedTargetViews(pkg.targetViews)}
                     className={`p-3 rounded-xl border text-left transition-all ${
                       isSelected
-                        ? 'bg-gradient-to-br from-purple-900 to-indigo-900 border-purple-400 text-white shadow-lg'
+                        ? 'bg-gradient-to-br from-purple-900 to-indigo-900 border-purple-400 text-white shadow-lg ring-1 ring-purple-400'
                         : 'bg-slate-950 border-purple-900/30 text-slate-300 hover:border-purple-700'
                     }`}
                   >
@@ -679,23 +736,42 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                         </span>
                       )}
                     </div>
-                    <div className="text-xs font-mono font-bold text-purple-300">
-                      {pkg.pointsCost} {t.points}
+                    <div className="flex items-center justify-between text-xs font-mono font-bold">
+                      <span className="text-amber-400">{pkg.pointsCost} {t.points}</span>
+                      <span className={`text-[10px] ${canAfford ? 'text-emerald-400' : 'text-rose-400'}`}>
+                        {canAfford ? '✓ Ready' : 'Low Pts'}
+                      </span>
                     </div>
                   </button>
                 );
               })}
             </div>
+
+            {(user.pointsBalance ?? user.points) < selectedTargetViews && (
+              <div className="p-2.5 rounded-xl bg-amber-950/40 border border-amber-500/30 text-[11px] text-amber-300 flex items-center justify-between">
+                <span>
+                  {lang === 'bn'
+                    ? `আপনার আরও ${selectedTargetViews - (user.pointsBalance ?? user.points)} পয়েন্ট প্রয়োজন। অ্যাড দেখে (+৩০ পয়েন্ট প্রতিবার) পয়েন্ট অর্জন করুন!`
+                    : `You need ${selectedTargetViews - (user.pointsBalance ?? user.points)} more points. Watch ads (+30 pts each) to earn!`}
+                </span>
+              </div>
+            )}
           </div>
 
           {/* Start Campaign Button */}
           <button
             onClick={handleStartCampaign}
-            disabled={selectedLinkIds.length === 0 || isStartingCampaign}
+            disabled={
+              selectedLinkIds.length === 0 ||
+              isStartingCampaign ||
+              (user.pointsBalance ?? user.points) < selectedTargetViews
+            }
             className="w-full py-3.5 bg-gradient-to-r from-purple-600 via-fuchsia-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 disabled:opacity-50 text-white font-extrabold text-xs rounded-2xl shadow-xl shadow-purple-950/40 flex items-center justify-center gap-2 transition-all active:scale-95"
           >
             <Play className="w-4 h-4 fill-current" />
-            {isStartingCampaign ? 'Launching Campaign...' : t.startCampaignBtn}
+            {isStartingCampaign
+              ? 'Launching Campaign...'
+              : `${t.startCampaignBtn} (${selectedTargetViews} Pts • ${selectedTargetViews} Impressions)`}
           </button>
         </div>
       )}

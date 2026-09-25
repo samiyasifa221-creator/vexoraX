@@ -393,11 +393,38 @@ app.post('/api/tasks/session/start', authenticate, (req: AuthenticatedRequest, r
     assignedLink = dbStore.getNextEligibleLink('Adsterra');
   }
 
-  // Retrieve real active links and real task URLs (NO FAKE / DEMO DOMAINS!)
-  const activeLinks = Array.from(dbStore.userLinks.values()).filter((l) => l.status === 'ACTIVE');
-  
-  const realAdList: Array<{ id: string; url: string; title: string; type: string; completedViews: number; targetViews: number }> = [];
-  if (task.url) {
+  // Retrieve real active links from other community users first (onnano user er adds)
+  const otherUsersLinks = Array.from(dbStore.userLinks.values()).filter(
+    (l) => l.status === 'ACTIVE' && l.userId !== user.userId
+  );
+  const allActiveLinks = Array.from(dbStore.userLinks.values()).filter((l) => l.status === 'ACTIVE');
+
+  // Prefer other users' ads; if none, use all active links
+  const primaryAdsSource = otherUsersLinks.length > 0 ? otherUsersLinks : allActiveLinks;
+
+  const realAdList: Array<{
+    id: string;
+    url: string;
+    title: string;
+    type: string;
+    completedViews: number;
+    targetViews: number;
+    userId?: string;
+  }> = [];
+
+  primaryAdsSource.forEach((l) => {
+    realAdList.push({
+      id: l.id,
+      url: l.url,
+      title: l.title,
+      type: l.type,
+      completedViews: l.completedViews,
+      targetViews: l.targetViews,
+      userId: l.userId,
+    });
+  });
+
+  if (task.url && !realAdList.some((r) => r.url === task.url)) {
     realAdList.push({
       id: `task_direct_${task.id}`,
       url: task.url,
@@ -407,43 +434,46 @@ app.post('/api/tasks/session/start', authenticate, (req: AuthenticatedRequest, r
       targetViews: 1000,
     });
   }
-  
-  activeLinks.forEach((l) => {
-    if (!realAdList.some((r) => r.url === l.url)) {
-      realAdList.push({
-        id: l.id,
-        url: l.url,
-        title: l.title,
-        type: l.type,
-        completedViews: l.completedViews,
-        targetViews: l.targetViews,
-      });
-    }
-  });
 
-  // If no links exist at all, add default real ad from task or real Adsterra link
+  // If no campaign links exist, preview https://newviralmoviesin2026.blogspot.com/
   if (realAdList.length === 0) {
     realAdList.push({
-      id: 'default_real_ad',
-      url: 'https://unlikelycharitablewanting.com/yq26ub6cn?key=2de33b5349b5825fabf2823dca90c5d1',
-      title: 'Adsterra Direct Link (Live CPM Stream)',
-      type: 'ADSTERRA',
+      id: 'default_viral_movies_blog',
+      url: 'https://newviralmoviesin2026.blogspot.com/',
+      title: 'New Viral Movies in 2026 (Featured Blog)',
+      type: 'Blogger',
       completedViews: 0,
       targetViews: 1000,
     });
   }
 
-  // Build playlist slots by cycling fairly through actual real ads
-  const slotCount = task.requiredDurationMs >= 300000 ? 8 : Math.max(1, Math.min(8, realAdList.length));
-  const realPlaylist: Array<{ id: string; index: number; url: string; title: string; type: string; completedViews: number; targetViews: number }> = [];
+  // Build playlist slots: 20 total ads previewed in rotation, each running for 20s (20 * 20s = 400s)
+  const is400sTask = task.requiredDurationMs >= 300000 || task.category === 'ADSTERRA';
+  const slotCount = is400sTask ? 20 : Math.max(1, Math.min(8, realAdList.length));
+  const realPlaylist: Array<{
+    id: string;
+    index: number;
+    url: string;
+    title: string;
+    type: string;
+    creatorName: string;
+    durationSec: number;
+    completedViews: number;
+    targetViews: number;
+  }> = [];
+
   for (let i = 0; i < slotCount; i++) {
     const item = realAdList[i % realAdList.length];
+    const creator = item.userId ? dbStore.users.get(item.userId) : null;
+    const creatorName = creator ? (creator.displayName || creator.name) : 'LoopPulse Member';
     realPlaylist.push({
       id: `${item.id}_slot_${i + 1}`,
       index: i + 1,
       url: item.url,
       title: item.title,
       type: item.type,
+      creatorName,
+      durationSec: 20,
       completedViews: item.completedViews,
       targetViews: item.targetViews,
     });
@@ -568,6 +598,12 @@ app.post('/api/tasks/session/verify', authenticate, (req: AuthenticatedRequest, 
     return res.status(410).json({ error: 'SESSION_EXPIRED', message: 'Task verification session has expired.' });
   }
 
+  // Play Integrity & Hardware Attestation Check
+  if (appIntegrityToken === 'ROOTED_TAMPERED' || attackType === 'ROOTED_DEVICE') {
+    user.riskScore = Math.min(100, user.riskScore + 40);
+    return res.status(403).json({ error: 'APP_INTEGRITY_FAILED', message: 'Play Integrity attestation failed. Rooted or tampered environment detected.' });
+  }
+
   // Token HMAC validation
   const isValidToken = dbStore.verifyTaskToken(
     session.taskSessionId,
@@ -582,10 +618,11 @@ app.post('/api/tasks/session/verify', authenticate, (req: AuthenticatedRequest, 
     return res.status(403).json({ error: 'INVALID_VERIFICATION_TOKEN', message: 'Cryptographic token validation failed.' });
   }
 
-  // Impossible speed check
+  // Impossible speed check (each ad is 20s; min required is 15s for 1 ad)
   const actualDurationMs = nowMs - session.startedAtMs;
-  const minRequiredMs = task.requiredDurationMs * 0.75;
-  const isDevTestMode = testMode === true || clientTimeElapsedMs >= task.requiredDurationMs;
+  const elapsedSec = (clientTimeElapsedMs || actualDurationMs) / 1000;
+  const minRequiredMs = 15000; // 15s minimum for 1 ad view
+  const isDevTestMode = testMode === true || (clientTimeElapsedMs && clientTimeElapsedMs >= 15000);
   if ((actualDurationMs < minRequiredMs && !isDevTestMode) || attackType === 'IMPOSSIBLE_SPEED') {
     user.riskScore = Math.min(100, user.riskScore + 30);
     session.status = 'REJECTED';
@@ -595,14 +632,11 @@ app.post('/api/tasks/session/verify', authenticate, (req: AuthenticatedRequest, 
     });
   }
 
-  if (appIntegrityToken === 'ROOTED_TAMPERED' || attackType === 'ROOTED_DEVICE') {
-    user.riskScore = Math.min(100, user.riskScore + 40);
-    return res.status(403).json({ error: 'APP_INTEGRITY_FAILED', message: 'Play Integrity attestation failed.' });
-  }
-
-  // Server-Authoritative Ledger Credit
+  // Server-Authoritative Ledger Credit (30 Points per Ad Viewed)
+  const adsWatched = Math.max(1, Math.min(20, Math.floor(elapsedSec / 20) || 1));
+  const baseReward = 30 * adsWatched;
   const balanceBefore = user.pointsBalance;
-  const rewardAmount = user.isPremium ? Math.round(task.rewardPoints * 1.5) : task.rewardPoints;
+  const rewardAmount = user.isPremium ? Math.round(baseReward * 1.5) : baseReward;
   const balanceAfter = balanceBefore + rewardAmount;
 
   const transaction: PointsTransaction = {
@@ -651,7 +685,7 @@ app.post('/api/tasks/session/verify', authenticate, (req: AuthenticatedRequest, 
 });
 
 // -------------------------------------------------------------
-// 11. USER CAMPAIGN LINKS (Max 8 Active Links per Account)
+// 11. USER CAMPAIGN LINKS (Strict Max 8 Ads per Account - aita barbe na)
 // -------------------------------------------------------------
 app.get('/api/links', authenticate, (req: AuthenticatedRequest, res: Response) => {
   const user = req.user!;
@@ -660,8 +694,10 @@ app.get('/api/links', authenticate, (req: AuthenticatedRequest, res: Response) =
 
   res.json({
     links: userLinks,
+    totalCount: userLinks.length,
     activeCount,
     maxAllowed: 8,
+    canAddMore: userLinks.length < 8,
   });
 });
 
@@ -683,15 +719,15 @@ app.post('/api/links', authenticate, (req: AuthenticatedRequest, res: Response) 
     return res.status(400).json({ error: 'INVALID_URL', message: 'Please provide a valid HTTP/HTTPS URL.' });
   }
 
-  // Maximum 8 ACTIVE links rule (Section 11)
-  const currentActiveLinks = Array.from(dbStore.userLinks.values()).filter(
-    (l) => l.userId === user.userId && l.status === 'ACTIVE'
+  // Strict Max 8 total ads per user rule (aita barbe na)
+  const userTotalLinks = Array.from(dbStore.userLinks.values()).filter(
+    (l) => l.userId === user.userId
   );
 
-  if (currentActiveLinks.length >= 8) {
+  if (userTotalLinks.length >= 8) {
     return res.status(400).json({
-      error: 'MAX_LINKS_REACHED',
-      message: 'Maximum limit of 8 ACTIVE links reached. Please deactivate or complete existing links first.',
+      error: 'MAX_8_ADS_LIMIT_REACHED',
+      message: 'Maximum limit of 8 ads reached. Each user is strictly allowed to add at most 8 ads (aita barbe na). Please delete an existing ad to add a new one.',
     });
   }
 
@@ -805,10 +841,11 @@ app.post('/api/campaigns', authenticate, (req: AuthenticatedRequest, res: Respon
     });
   }
 
-  // Find package pricing
-  const pkg = dbStore.appConfig.campaignPackages.find((p) => p.targetViews === Number(targetViews)) || {
-    targetViews: Number(targetViews) || 50,
-    pointsCost: Math.round(Number(targetViews) * 1.8) || 90,
+  // Find package pricing (50 points for 50 impressions, 100 for 100, 150 for 150, 200 for 200)
+  const targetNum = Number(targetViews) || 50;
+  const pkg = dbStore.appConfig.campaignPackages.find((p) => p.targetViews === targetNum) || {
+    targetViews: targetNum,
+    pointsCost: targetNum,
   };
 
   const pointsCost = pkg.pointsCost;
@@ -1460,7 +1497,7 @@ app.get('/api/release/checklist', authenticate, (_req: AuthenticatedRequest, res
 // -------------------------------------------------------------
 // Catch-all for API 404s (Guarantees JSON is ALWAYS returned for /api/*, NEVER HTML!)
 // -------------------------------------------------------------
-app.all('/api/*', (req: Request, res: Response) => {
+app.all(['/api', '/api/*'], (req: Request, res: Response) => {
   res.status(404).json({
     error: 'API_ENDPOINT_NOT_FOUND',
     message: `API endpoint ${req.method} ${req.path} does not exist.`,
@@ -1485,18 +1522,30 @@ async function setupViteOrStatic() {
     app.get('*', (_req: Request, res: Response) => {
       res.sendFile(path.resolve(__dirname, 'dist', 'index.html'));
     });
+    app.listen(PORT, '0.0.0.0', () => {
+      console.log(`[VexoraX] Production server active on http://0.0.0.0:${PORT}`);
+    });
   } else {
+    const http = await import('http');
+    const httpServer = http.createServer(app);
     const { createServer: createViteServer } = await import('vite');
+
     const vite = await createViteServer({
-      server: { middlewareMode: true },
+      server: {
+        middlewareMode: true,
+        hmr: {
+          server: httpServer,
+        },
+      },
       appType: 'spa',
     });
-    app.use(vite.middlewares);
-  }
 
-  app.listen(PORT, '0.0.0.0', () => {
-    console.log(`[VexoraX] Server active on http://0.0.0.0:${PORT}`);
-  });
+    app.use(vite.middlewares);
+
+    httpServer.listen(PORT, '0.0.0.0', () => {
+      console.log(`[VexoraX] Dev Server with Vite HMR active on http://0.0.0.0:${PORT}`);
+    });
+  }
 }
 
 setupViteOrStatic();

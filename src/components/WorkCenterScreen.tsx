@@ -144,26 +144,26 @@ export const WorkCenterScreen: React.FC<WorkCenterScreenProps> = ({
         </span>
       </div>
 
-      {/* 400s Continuous 8-Ad Loop Spotlight Banner */}
+      {/* 400s Continuous 20-Ad Loop Spotlight Banner */}
       <div className="p-3.5 bg-gradient-to-r from-purple-950/80 via-indigo-950/70 to-slate-900 rounded-2xl border border-purple-600/40 text-xs space-y-2">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2 text-purple-300 font-bold">
             <Sparkles className="w-4 h-4 text-amber-400 shrink-0" />
             <span>
-              {lang === 'bn' ? 'স্বয়ংক্রিয় ৮টি অ্যাড রোটেশন (৪০০ সেকেন্ড)' : 'Continuous 8-Ad Auto-Stream (400s)'}
+              {lang === 'bn' ? 'স্বয়ংক্রিয় ২০টি অ্যাড রোটেশন (২০ সেকেন্ড করে • প্রতি অ্যাড ৩০ পয়েন্ট)' : 'Continuous 20-Ad Auto-Stream (20s per ad • 30 Pts each)'}
             </span>
           </div>
-          <span className="text-[9px] bg-amber-500/20 text-amber-300 border border-amber-500/30 px-2 py-0.5 rounded-full font-bold">
-            +450 Pts
+          <span className="text-[10px] bg-amber-500/20 text-amber-300 border border-amber-500/30 px-2 py-0.5 rounded-full font-bold">
+            {lang === 'bn' ? '+৩০ পয়েন্ট / অ্যাড' : '+30 Pts / Ad'}
           </span>
         </div>
         <p className="text-[11px] text-slate-300 leading-relaxed">
           {lang === 'bn'
-            ? 'অ্যাড একটি চলার পর আর থামবে না! ৮টি অ্যাড ধারাবাহিকভাবে একের পর এক ৪০০ সেকেন্ড ধরে চলবে। ৪০০ সেকেন্ড শেষ হলে ৫ মিনিটের বিরতি শুরু হবে।'
-            : 'Ads no longer stop after one! 8 ads auto-advance sequentially over 400 seconds. Upon completing 400s, an automatic 5-minute break period begins.'}
+            ? 'প্রতিটি অ্যাড ২০ সেকেন্ড চলবে এবং একবার অ্যাড দেখলেই ৩০ পয়েন্ট পাবেন! মোট ২০টি অ্যাড প্রিভিউ হবে এবং প্রতিটিতে ৩০ পয়েন্ট করে আয় হবে।'
+            : 'Each ad plays for 20 seconds and gives 30 points per ad view! 20 ads rotate sequentially with instant point claiming enabled.'}
         </p>
         <div className="text-[10px] text-cyan-400 font-mono flex items-center gap-1.5 pt-0.5 truncate">
-          <span className="text-slate-400">Primary Ad:</span>
+          <span className="text-slate-400">Live Stream:</span>
           <span className="truncate">https://unlikelycharitablewanting.com/yq26ub6cn?key=2de33b5349b5825fabf2823dca90c5d1</span>
         </div>
       </div>

@@ -50,11 +50,37 @@ export default function App() {
       });
       if (res.ok) {
         const data = await res.json();
-        setToken(data.token);
-        setCurrentUser(data.user);
+        if (data.token && data.user) {
+          setToken(data.token);
+          setCurrentUser(data.user);
+          setLoading(false);
+        }
+      } else {
+        // Retry shortly if server was starting up
+        setTimeout(async () => {
+          try {
+            const retryRes = await fetch('/api/auth/login', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ email, password: pass, deviceId: 'dev_pixel8_pro_993' }),
+            });
+            if (retryRes.ok) {
+              const retryData = await retryRes.json();
+              if (retryData.token && retryData.user) {
+                setToken(retryData.token);
+                setCurrentUser(retryData.user);
+              }
+            }
+          } catch (err) {
+            console.error(err);
+          } finally {
+            setLoading(false);
+          }
+        }, 600);
       }
     } catch (e) {
       console.error(e);
+      setLoading(false);
     }
   };
 
